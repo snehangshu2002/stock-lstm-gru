@@ -8,6 +8,7 @@ import numpy as np
 import argparse
 import os
 import json
+import pickle
 from typing import Optional
 
 # Import local modules
@@ -67,7 +68,7 @@ def train(
         df,
         target_column=target_column,
         sequence_length=sequence_length,
-        train_ratio=train_ratio
+        test_ratio=1 - train_ratio
     )
 
     X_train = data['X_train']
@@ -136,17 +137,32 @@ def train(
             'mae': [float(x) for x in history.history['mae']],
             'val_mae': [float(x) for x in history.history['val_mae']]
         }, f, indent=2)
+
+    # Save scalers for consistent preprocessing at prediction time
+    scalers_path = os.path.join(model_save_path, 'scalers.pkl')
+    with open(scalers_path, 'wb') as f:
+        pickle.dump({
+            'feature_scaler': data['feature_scaler'],
+            'target_scaler': target_scaler,
+            'feature_columns': data['feature_columns'],
+            'target_column': target_column,
+            'sequence_length': sequence_length
+        }, f)
     
     print(f"\nModel saved to: {model_filename}")
     print(f"Training history saved to: {history_path}")
-    
+    print(f"Scalers saved to: {scalers_path}")
+
     return {
         'model': model,
         'history': history,
         'eval_results': eval_results,
-        'scaler': scaler,
+        'scaler': target_scaler,
+        'target_scaler': target_scaler,
+        'feature_scaler': data['feature_scaler'],
         'model_path': model_filename,
-        'history_path': history_path
+        'history_path': history_path,
+        'scalers_path': scalers_path
     }
 
 
