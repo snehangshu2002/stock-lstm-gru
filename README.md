@@ -28,7 +28,6 @@ Stock_Price_Prediction/
 - **LSTM Model**: Long Short-Term Memory network for sequence prediction
 - **GRU Model**: Gated Recurrent Unit network (faster alternative to LSTM)
 - **Data Preprocessing**: Automatic data cleaning, normalization, and sequence creation
-- **Model Comparison**: Side-by-side comparison of LSTM and GRU performance
 - **Future Prediction**: Predict future stock prices beyond the test set
 - **Visualization**: Comprehensive plotting for analysis and results
 
@@ -77,7 +76,7 @@ Place your CSV files in the `data/` directory with the following columns:
 - `High`
 - `Low`
 - `Close`
-- `Volume` (optional)
+- `Volume`
 - `Adj Close` (optional)
 
 Current datasets included:
@@ -86,18 +85,16 @@ Current datasets included:
 
 ## 🎯 Usage
 
-### Training a Model
+### 1) Train a Model (First)
 
 **Train LSTM Model:**
 ```bash
-cd src
-python train.py --data ../data/Adani_port_stock.csv --model-type lstm --epochs 50
+uv run src/train.py --data data/Adani_port_stock.csv --model-type lstm --model-save-path models --epochs 50
 ```
 
 **Train GRU Model:**
 ```bash
-cd src
-python train.py --data ../data/Adani_port_stock.csv --model-type gru --epochs 50
+uv run src/train.py --data data/Adani_port_stock.csv --model-type gru --model-save-path models --epochs 50
 ```
 
 **Training Options:**
@@ -112,29 +109,23 @@ python train.py --data ../data/Adani_port_stock.csv --model-type gru --epochs 50
 --target-column     Column to predict (default: Close)
 ```
 
-### Making Predictions
+Training saves:
+- Model file: `models/lstm_model.h5` or `models/gru_model.h5`
+- Scalers file: `models/scalers.pkl`
+
+### 2) Predict (After Training)
 
 **Predict with Trained Model:**
 ```bash
-cd src
-python predict.py --model ../models/lstm_model.h5 --model-type lstm --data ../data/Adani_port_stock.csv
+uv run src/predict.py --model models/lstm_model.h5 --model-type lstm --data data/Adani_port_stock.csv --scaler-path models/scalers.pkl
 ```
 
 **Predict Future Days:**
 ```bash
-python predict.py --model ../models/lstm_model.h5 --model-type lstm --predict-future 7
+uv run src/predict.py --model models/lstm_model.h5 --model-type lstm --data data/Adani_port_stock.csv --scaler-path models/scalers.pkl --predict-future 7
 ```
 
-**Compare LSTM and GRU:**
-```python
-from predict import compare_models
-
-results = compare_models(
-    lstm_model_path='../models/lstm_model.h5',
-    gru_model_path='../models/gru_model.h5',
-    data_path='../data/Adani_port_stock.csv'
-)
-```
+For new/unseen data, use a CSV with the same columns (`Date, Open, High, Low, Close, Volume`) and run the same `predict.py` command with `--data path/to/new.csv`.
 
 ### Using the Jupyter Notebook
 
@@ -155,7 +146,7 @@ The notebook provides a complete walkthrough of:
 
 ### LSTM Model
 ```
-Input (sequence_length, 1)
+Input (sequence_length, 5)
 ↓
 LSTM (50 units, return_sequences=True)
 ↓
@@ -172,7 +163,7 @@ Dense (1 unit)
 
 ### GRU Model
 ```
-Input (sequence_length, 1)
+Input (sequence_length, 5)
 ↓
 GRU (50 units, return_sequences=True)
 ↓
@@ -207,10 +198,10 @@ df = load_stock_data('data/Adani_port_stock.csv')
 df = clean_data(df)
 
 # Prepare data
-data = prepare_data(df, sequence_length=60, train_ratio=0.8)
+data = prepare_data(df, sequence_length=60, test_ratio=0.2)
 
 # Create and train model
-model = create_lstm_model(input_shape=(60, 1))
+model = create_lstm_model(input_shape=(60, 5))
 history = train_lstm_model(
     model,
     data['X_train'], data['y_train'],
@@ -219,7 +210,7 @@ history = train_lstm_model(
 )
 
 # Evaluate
-results = evaluate_lstm_model(model, data['X_test'], data['y_test'], data['scaler'])
+results = evaluate_lstm_model(model, data['X_test'], data['y_test'], data['target_scaler'])
 print(f"RMSE: {results['rmse']:.4f}")
 print(f"R²: {results['r2']:.4f}")
 ```
