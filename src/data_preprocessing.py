@@ -56,26 +56,6 @@ def clean_data(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def normalize_data(
-    data: np.ndarray, 
-    feature_range: Tuple[float, float] = (0, 1)
-) -> Tuple[np.ndarray, MinMaxScaler]:
-    """
-    Normalize data using MinMax scaling.
-    
-    Args:
-        data: Array of data to normalize (can be 1D or 2D)
-        feature_range: Tuple of (min, max) for scaled data
-        
-    Returns:
-        Tuple of (normalized_data, scaler)
-    """
-    scaler = MinMaxScaler(feature_range=feature_range)
-    normalized_data = scaler.fit_transform(data)
-    
-    return normalized_data, scaler
-
-
 def create_sequences(
     data: np.ndarray,
     sequence_length: int,
@@ -172,36 +152,6 @@ def prepare_data(
         'target_column': target_column,
         'test_ratio': test_ratio,
     }
-
-def download_stock_data(
-    ticker: str,
-    start_date: str,
-    end_date: str,
-    output_path: str
-) -> pd.DataFrame:
-    """
-    Download stock data from Yahoo Finance.
-    
-    Args:
-        ticker: Stock ticker symbol
-        start_date: Start date (YYYY-MM-DD)
-        end_date: End date (YYYY-MM-DD)
-        output_path: Path to save the CSV file
-        
-    Returns:
-        DataFrame with stock data
-    """
-    try:
-        import yfinance as yf
-        
-        df = yf.download(ticker, start=start_date, end=end_date)
-        df = df.reset_index()
-        df.to_csv(output_path, index=False)
-        
-        return df
-    except ImportError:
-        raise ImportError("yfinance is required. Install with: pip install yfinance")
-
 
 if __name__ == "__main__":
    print("Works")
