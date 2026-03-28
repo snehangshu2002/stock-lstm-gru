@@ -8,3 +8,7 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Local config and notes
+.qwen/settings.json
+QWEN.md
