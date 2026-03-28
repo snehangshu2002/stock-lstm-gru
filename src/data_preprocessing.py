@@ -8,7 +8,7 @@ for LSTM and GRU models.
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
-from typing import Tuple, Optional
+from typing import Tuple, List
 import os
 
 
@@ -46,21 +46,24 @@ def clean_data(df: pd.DataFrame) -> pd.DataFrame:
     # Drop rows with all NaN values
     df = df.dropna(how='all')
     
-    # Forward fill missing values
-    df = df.fillna(method='ffill')
+    # Forward fill missing values (✅ Updated syntax)
+    df = df.ffill()
     
-    # Backward fill any remaining missing values
-    df = df.fillna(method='bfill')
+    # Backward fill any remaining missing values (✅ Updated syntax)
+    df = df.bfill()
     
     return df
 
 
-def normalize_data(data: np.ndarray, feature_range: Tuple[float, float] = (0, 1)) -> Tuple[np.ndarray, MinMaxScaler]:
+def normalize_data(
+    data: np.ndarray, 
+    feature_range: Tuple[float, float] = (0, 1)
+) -> Tuple[np.ndarray, MinMaxScaler]:
     """
     Normalize data using MinMax scaling.
     
     Args:
-        data: Array of data to normalize
+        data: Array of data to normalize (can be 1D or 2D)
         feature_range: Tuple of (min, max) for scaled data
         
     Returns:
@@ -73,17 +76,17 @@ def normalize_data(data: np.ndarray, feature_range: Tuple[float, float] = (0, 1)
 
 
 def create_sequences(
-    features: np.ndarray,
-    targets: np.ndarray,
-    sequence_length: int
+    data: np.ndarray,
+    sequence_length: int,
+    target_column_index: int = 3
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
     Create sequences for time series prediction.
 
     Args:
-        features: Array of feature data (multiple columns)
-        targets: Array of target data (single column)
+        data: NumPy array of data (all columns)
         sequence_length: Number of time steps for each sequence
+        target_column_index: Index of the column to predict (default: 3 for 'Close')
 
     Returns:
         Tuple of (sequences, targets)
@@ -91,66 +94,87 @@ def create_sequences(
     sequences = []
     target_values = []
 
-    for i in range(len(features) - sequence_length):
-        sequences.append(features[i:i + sequence_length])
-        target_values.append(targets[i + sequence_length])
+    for i in range(len(data) - sequence_length):
+        
+        sequences.append(data[i:i + sequence_length])
+        target_values.append(data[i + sequence_length][target_column_index])
 
     return np.array(sequences), np.array(target_values)
 
 
 def prepare_data(
     df: pd.DataFrame,
-    feature_columns: list = None,
+    feature_columns: List[str] = None,
     target_column: str = 'Close',
     sequence_length: int = 60,
-    train_ratio: float = 0.8,
-    normalize: bool = True
+    test_ratio: float = 0.2,
+    normalize: bool = True,
 ) -> dict:
     """
     Prepare data for model training.
-
-    Args:
-        df: Stock data DataFrame
-        feature_columns: List of columns to use as features (default: ['Open', 'High', 'Low', 'Close', 'Volume'])
-        target_column: Column to predict (default: 'Close')
-        sequence_length: Number of time steps for sequences
-        train_ratio: Ratio of data for training
-        normalize: Whether to normalize the data
-
-    Returns:
-        Dictionary containing training and testing data
+    
+    IMPORTANT: Normalization is performed AFTER train/test split to prevent data leakage.
+    The scaler is fit only on training data, then applied to both train and test sets.
     """
-    # Set default feature columns if not provided
     if feature_columns is None:
         feature_columns = ['Open', 'High', 'Low', 'Close', 'Volume']
 
-    # Extract feature and target columns
     feature_data = df[feature_columns].values
-    target_data = df[[target_column]].values
+    target_data = df[[target_column]].values  # Keep as 2D (n, 1)
 
-    # Normalize data
+    # Get target column index for sequence creation
+    target_idx = feature_columns.index(target_column)
+
+    # Create sequences from RAW data FIRST (before normalization)
+    # targets here are the next-step values for target_column
+    sequences, targets = create_sequences(
+        feature_data,
+        sequence_length,
+        target_idx
+    )
+
+    # Keep targets as 2D for scaler compatibility
+    targets = targets.reshape(-1, 1)
+
+    # Split data FIRST (before normalization) - CRITICAL for time series!
+    split_index = int(len(sequences) * (1 - test_ratio))
+    
+    X_train_raw = sequences[:split_index]
+    X_test_raw = sequences[split_index:]
+    y_train_raw = targets[:split_index]
+    y_test_raw = targets[split_index:]
+
     feature_scaler = None
     target_scaler = None
+
     if normalize:
-        normalized_features, feature_scaler = normalize_data(feature_data)
-        normalized_targets, target_scaler = normalize_data(target_data)
+        # Get dimensions
+        n_train_samples, n_timesteps, n_features = X_train_raw.shape
+        n_test_samples = X_test_raw.shape[0]
+        
+        # Fit scaler ONLY on training data
+        feature_scaler = MinMaxScaler(feature_range=(0, 1))
+        X_train_reshaped = X_train_raw.reshape(-1, n_features)
+        feature_scaler.fit(X_train_reshaped)
+        
+        # Transform both train and test using the SAME scaler (fit on train only!)
+        X_train = feature_scaler.transform(X_train_reshaped).reshape(n_train_samples, n_timesteps, n_features)
+        X_test = feature_scaler.transform(X_test_raw.reshape(-1, n_features)).reshape(n_test_samples, n_timesteps, n_features)
+        
+        # Scale targets separately (fit on train only)
+        target_scaler = MinMaxScaler(feature_range=(0, 1))
+        target_scaler.fit(y_train_raw)
+        y_train = target_scaler.transform(y_train_raw).flatten()
+        y_test = target_scaler.transform(y_test_raw).flatten()
     else:
-        normalized_features = feature_data
-        normalized_targets = target_data
+        X_train = X_train_raw
+        X_test = X_test_raw
+        y_train = y_train_raw.flatten()
+        y_test = y_test_raw.flatten()
 
-    # Create sequences
-    sequences, targets = create_sequences(normalized_features, normalized_targets, sequence_length)
-
-    # Split data
-    split_index = int(len(sequences) * train_ratio)
-
-    X_train = sequences[:split_index]
-    y_train = targets[:split_index]
-    X_test = sequences[split_index:]
-    y_test = targets[split_index:]
-
-    # Store original test data for inverse transform
-    original_test_data = target_data[split_index + sequence_length:]
+    # Calculate test start index for original data
+    test_start_idx = split_index
+    original_test_data = target_data[test_start_idx + sequence_length:test_start_idx + sequence_length + len(y_test)]
 
     return {
         'X_train': X_train,
@@ -162,9 +186,9 @@ def prepare_data(
         'original_test_data': original_test_data,
         'sequence_length': sequence_length,
         'feature_columns': feature_columns,
-        'target_column': target_column
+        'target_column': target_column,
+        'test_ratio': test_ratio,
     }
-
 
 def download_stock_data(
     ticker: str,
@@ -197,33 +221,4 @@ def download_stock_data(
 
 
 if __name__ == "__main__":
-    # Example usage
-    print("Data Preprocessing Module")
-    print("=" * 40)
-
-    # Test with sample data (multiple features)
-    n_samples = 1000
-    n_features = 5  # Open, High, Low, Close, Volume
-    sample_features = np.random.randn(n_samples, n_features)
-    sample_targets = np.random.randn(n_samples, 1)
-
-    # Normalize data
-    normalized_features, feature_scaler = normalize_data(sample_features)
-    normalized_targets, target_scaler = normalize_data(sample_targets)
-
-    # Create sequences
-    sequences, targets = create_sequences(
-        normalized_features,
-        normalized_targets,
-        sequence_length=60
-    )
-
-    print(f"Original features shape: {sample_features.shape}")
-    print(f"Original targets shape: {sample_targets.shape}")
-    print(f"Normalized features shape: {normalized_features.shape}")
-    print(f"Sequences shape: {sequences.shape}")
-    print(f"Targets shape: {targets.shape}")
-    print(f"\nSequence shape breakdown: (samples, timesteps, features)")
-    print(f"  - Samples: {sequences.shape[0]}")
-    print(f"  - Timesteps: {sequences.shape[1]}")
-    print(f"  - Features: {sequences.shape[2]}")
+   print("Works")
