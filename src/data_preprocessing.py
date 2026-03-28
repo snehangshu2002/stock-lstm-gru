@@ -100,9 +100,9 @@ def prepare_data(
     if feature_columns is None:
         feature_columns = ['Open', 'High', 'Low', 'Close', 'Volume']
 
-    feature_data = df[feature_columns].to_numpy()
-    target_data = df[[target_column]].to_numpy()
-    target_idx = feature_columns.index(target_column)
+    feature_data = df[feature_columns].to_numpy() # Converts to Numpy array
+    target_data = df[[target_column]].to_numpy() # Converts to Numpy array
+    target_idx = feature_columns.index(target_column) # 3> CLose index in the feature column list 
 
     X, y = create_sequences(feature_data, sequence_length, target_idx)
     y = y.reshape(-1, 1)
