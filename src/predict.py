@@ -7,13 +7,13 @@ Handles loading trained models and making predictions on new data.
 import numpy as np
 import argparse
 import os
+import pickle
 from typing import Optional, List
 
 # Import local modules
 from data_preprocessing import (
     load_stock_data,
     clean_data,
-    normalize_data
 )
 
 
@@ -45,7 +45,8 @@ def predict(
     sequence_length: int = 60,
     target_column: str = 'Close',
     predict_future: int = 0,
-    feature_columns: list = None
+    feature_columns: list = None,
+    scaler_path: str = None
 ) -> dict:
     """
     Make predictions using a trained model.
@@ -58,6 +59,7 @@ def predict(
         target_column: Column that was predicted
         predict_future: Number of future days to predict (0 = use test data)
         feature_columns: List of feature columns to use
+        scaler_path: Path to saved scaler (optional, for proper inverse transform)
 
     Returns:
         Dictionary with predictions and actual values
@@ -83,12 +85,27 @@ def predict(
     feature_data = df[feature_columns].values
     target_data = df[[target_column]].values
 
-    # Normalize the data
+    # Load saved scalers when available; fallback keeps backward compatibility.
     from sklearn.preprocessing import MinMaxScaler
-    feature_scaler = MinMaxScaler()
-    target_scaler = MinMaxScaler()
-    normalized_features = feature_scaler.fit_transform(feature_data)
-    normalized_targets = target_scaler.fit_transform(target_data)
+    feature_scaler = None
+    target_scaler = None
+
+    if scaler_path and os.path.exists(scaler_path):
+        with open(scaler_path, 'rb') as f:
+            scaler_bundle = pickle.load(f)
+        feature_scaler = scaler_bundle.get('feature_scaler')
+        target_scaler = scaler_bundle.get('target_scaler')
+        print(f"Loaded scalers from: {scaler_path}")
+
+    if feature_scaler is None or target_scaler is None:
+        print("Scaler file not found or incomplete. Falling back to fit scalers on provided data.")
+        feature_scaler = MinMaxScaler()
+        target_scaler = MinMaxScaler()
+        feature_scaler.fit(feature_data)
+        target_scaler.fit(target_data)
+
+    normalized_features = feature_scaler.transform(feature_data)
+    normalized_targets = target_scaler.transform(target_data)
 
     # Create sequences
     sequences = []
@@ -96,7 +113,7 @@ def predict(
     for i in range(len(normalized_features) - sequence_length):
         sequences.append(normalized_features[i:i + sequence_length])
         targets.append(normalized_targets[i + sequence_length])
-    
+
     sequences = np.array(sequences)
     targets = np.array(targets)
 
@@ -119,10 +136,10 @@ def predict(
             pred_norm = model.predict(last_sequence, verbose=0)
             future_predictions.append(pred_norm[0, 0])
 
-            # Update sequence with new prediction (for target only, we need to update features)
-            # For simplicity, we shift and repeat the last prediction for all features
+            # Simple autoregressive fallback:
+            # shift sequence and use predicted target as proxy for all features.
             last_sequence = np.roll(last_sequence, -1, axis=1)
-            last_sequence[0, -1, :] = pred_norm[0, 0]  # This is approximate
+            last_sequence[0, -1, :] = pred_norm[0, 0]
 
         future_predictions = target_scaler.inverse_transform(
             np.array(future_predictions).reshape(-1, 1)
@@ -146,7 +163,8 @@ def predict_single_day(
     historical_data: np.ndarray,
     model_type: str = 'lstm',
     sequence_length: int = 60,
-    feature_columns: list = None
+    feature_columns: list = None,
+    scaler_path: str = None
 ) -> float:
     """
     Predict the next day's price given historical data.
@@ -157,6 +175,7 @@ def predict_single_day(
         model_type: Type of model ('lstm' or 'gru')
         sequence_length: Number of time steps the model expects
         feature_columns: List of feature columns
+        scaler_path: Path to saved scalers.pkl from training (recommended)
 
     Returns:
         Predicted next day price (Close)
@@ -176,8 +195,20 @@ def predict_single_day(
 
     # Normalize
     from sklearn.preprocessing import MinMaxScaler
-    scaler = MinMaxScaler()
-    input_normalized = scaler.fit_transform(input_data)
+    feature_scaler = None
+    target_scaler = None
+    if scaler_path and os.path.exists(scaler_path):
+        with open(scaler_path, 'rb') as f:
+            scaler_bundle = pickle.load(f)
+        feature_scaler = scaler_bundle.get('feature_scaler')
+        target_scaler = scaler_bundle.get('target_scaler')
+
+    if feature_scaler is None:
+        # Backward-compatible fallback when scaler file is unavailable
+        feature_scaler = MinMaxScaler()
+        feature_scaler.fit(input_data)
+
+    input_normalized = feature_scaler.transform(input_data)
 
     # Reshape for model input
     n_features = len(feature_columns) if feature_columns else 5
@@ -186,10 +217,11 @@ def predict_single_day(
     # Predict
     prediction_normalized = model.predict(input_sequence, verbose=0)
     
-    # Inverse transform only the target (Close price)
-    # Assuming Close is one of the features, we need a separate scaler for it
-    # For simplicity, return normalized prediction
-    return prediction_normalized[0, 0]
+    if target_scaler is not None:
+        return float(target_scaler.inverse_transform(prediction_normalized)[0, 0])
+
+    # If no saved target scaler is available, return normalized output
+    return float(prediction_normalized[0, 0])
 
 
 def compare_models(
@@ -310,6 +342,12 @@ def main():
         default=0,
         help='Number of future days to predict'
     )
+    parser.add_argument(
+        '--scaler-path',
+        type=str,
+        default=None,
+        help='Path to saved scalers.pkl from training (recommended)'
+    )
     
     args = parser.parse_args()
     
@@ -320,7 +358,8 @@ def main():
         model_type=args.model_type,
         sequence_length=args.sequence_length,
         target_column=args.target_column,
-        predict_future=args.predict_future
+        predict_future=args.predict_future,
+        scaler_path=args.scaler_path
     )
     
     # Display some predictions
