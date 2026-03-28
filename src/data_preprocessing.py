@@ -119,62 +119,41 @@ def prepare_data(
     if feature_columns is None:
         feature_columns = ['Open', 'High', 'Low', 'Close', 'Volume']
 
-    feature_data = df[feature_columns].values
-    target_data = df[[target_column]].values  # Keep as 2D (n, 1)
-
-    # Get target column index for sequence creation
+    feature_data = df[feature_columns].to_numpy()
+    target_data = df[[target_column]].to_numpy()
     target_idx = feature_columns.index(target_column)
 
-    # Create sequences from RAW data FIRST (before normalization)
-    # targets here are the next-step values for target_column
-    sequences, targets = create_sequences(
-        feature_data,
-        sequence_length,
-        target_idx
-    )
+    X, y = create_sequences(feature_data, sequence_length, target_idx)
+    y = y.reshape(-1, 1)
 
-    # Keep targets as 2D for scaler compatibility
-    targets = targets.reshape(-1, 1)
-
-    # Split data FIRST (before normalization) - CRITICAL for time series!
-    split_index = int(len(sequences) * (1 - test_ratio))
-    
-    X_train_raw = sequences[:split_index]
-    X_test_raw = sequences[split_index:]
-    y_train_raw = targets[:split_index]
-    y_test_raw = targets[split_index:]
+    split_index = int(len(X) * (1 - test_ratio))
+    X_train_raw, X_test_raw = X[:split_index], X[split_index:]
+    y_train_raw, y_test_raw = y[:split_index], y[split_index:]
 
     feature_scaler = None
     target_scaler = None
 
     if normalize:
-        # Get dimensions
-        n_train_samples, n_timesteps, n_features = X_train_raw.shape
-        n_test_samples = X_test_raw.shape[0]
-        
-        # Fit scaler ONLY on training data
-        feature_scaler = MinMaxScaler(feature_range=(0, 1))
-        X_train_reshaped = X_train_raw.reshape(-1, n_features)
-        feature_scaler.fit(X_train_reshaped)
-        
-        # Transform both train and test using the SAME scaler (fit on train only!)
-        X_train = feature_scaler.transform(X_train_reshaped).reshape(n_train_samples, n_timesteps, n_features)
-        X_test = feature_scaler.transform(X_test_raw.reshape(-1, n_features)).reshape(n_test_samples, n_timesteps, n_features)
-        
-        # Scale targets separately (fit on train only)
-        target_scaler = MinMaxScaler(feature_range=(0, 1))
-        target_scaler.fit(y_train_raw)
-        y_train = target_scaler.transform(y_train_raw).flatten()
-        y_test = target_scaler.transform(y_test_raw).flatten()
-    else:
-        X_train = X_train_raw
-        X_test = X_test_raw
-        y_train = y_train_raw.flatten()
-        y_test = y_test_raw.flatten()
+        n_features = X_train_raw.shape[-1]
 
-    # Calculate test start index for original data
-    test_start_idx = split_index
-    original_test_data = target_data[test_start_idx + sequence_length:test_start_idx + sequence_length + len(y_test)]
+        feature_scaler = MinMaxScaler(feature_range=(0, 1))
+        X_train = feature_scaler.fit_transform(
+            X_train_raw.reshape(-1, n_features)
+        ).reshape(X_train_raw.shape)
+        X_test = feature_scaler.transform(
+            X_test_raw.reshape(-1, n_features)
+        ).reshape(X_test_raw.shape)
+
+        target_scaler = MinMaxScaler(feature_range=(0, 1))
+        y_train = target_scaler.fit_transform(y_train_raw).ravel()
+        y_test = target_scaler.transform(y_test_raw).ravel()
+    else:
+        X_train, X_test = X_train_raw, X_test_raw
+        y_train, y_test = y_train_raw.ravel(), y_test_raw.ravel()
+
+    original_test_data = target_data[
+        split_index + sequence_length: split_index + sequence_length + len(y_test)
+    ]
 
     return {
         'X_train': X_train,
