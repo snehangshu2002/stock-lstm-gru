@@ -12,3 +12,4 @@ wheels/
 # Local config and notes
 .qwen/settings.json
 QWEN.md
+AGENTS.md
