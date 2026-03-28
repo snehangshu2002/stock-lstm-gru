@@ -47,10 +47,10 @@ def clean_data(df: pd.DataFrame) -> pd.DataFrame:
     # Drop rows with all NaN values
     df = df.dropna(how='all')
     
-    # Forward fill missing values (✅ Updated syntax)
+    # Forward fill missing values 
     df = df.ffill()
     
-    # Backward fill any remaining missing values (✅ Updated syntax)
+    # Backward fill any remaining missing values 
     df = df.bfill()
     
     return df
