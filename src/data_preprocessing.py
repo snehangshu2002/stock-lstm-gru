@@ -8,6 +8,7 @@ for LSTM and GRU models.
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
+from sklearn.model_selection import train_test_split
 from typing import Tuple, List
 import os
 
@@ -126,9 +127,12 @@ def prepare_data(
     X, y = create_sequences(feature_data, sequence_length, target_idx)
     y = y.reshape(-1, 1)
 
-    split_index = int(len(X) * (1 - test_ratio))
-    X_train_raw, X_test_raw = X[:split_index], X[split_index:]
-    y_train_raw, y_test_raw = y[:split_index], y[split_index:]
+    X_train_raw, X_test_raw, y_train_raw, y_test_raw = train_test_split(
+        X,
+        y,
+        test_size=test_ratio,
+        shuffle=False
+    )
 
     feature_scaler = None
     target_scaler = None
@@ -152,7 +156,7 @@ def prepare_data(
         y_train, y_test = y_train_raw.ravel(), y_test_raw.ravel()
 
     original_test_data = target_data[
-        split_index + sequence_length: split_index + sequence_length + len(y_test)
+        len(X_train_raw) + sequence_length: len(X_train_raw) + sequence_length + len(y_test)
     ]
 
     return {
