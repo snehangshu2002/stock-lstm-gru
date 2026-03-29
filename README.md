@@ -44,12 +44,11 @@ Put CSV files in `data/` with these columns:
 - `Low`
 - `Close`
 - `Volume`
-- `Adj Close` (optional)
 
 Included datasets:
 
 - `data/Adani_port_stock.csv`
-- `data/APSE Historical Data.csv`
+
 
 ## Train
 
@@ -113,13 +112,32 @@ jupyter notebook notebooks/analysis_simple.ipynb
 
 In the current notebook version, both models use stacked recurrent layers without dropout.
 
-- LSTM stack: recurrent layers + dense regression head
-- GRU stack: recurrent layers + dense regression head
+- LSTM stack: `LSTM(100) -> LSTM(100) -> LSTM(50) -> Dense(1)`  
+  Trainable params: `153,051`
+- GRU stack: `GRU(100) -> GRU(100) -> GRU(50) -> Dense(1)`  
+  Trainable params: `115,551`
 
 `stacked` means more than one recurrent layer of the same type is used in sequence.
 
-## Metrics
+## Notebook run snapshot (`notebooks/analysis_simple.ipynb`)
 
-- RMSE
-- MAE
-- R2 score
+This section reflects the latest executed outputs currently saved in the notebook.
+
+Notebook settings used in that run:
+
+- Sequence length: `100`
+- Train/test split: `80/20` with `shuffle=False`
+- Batch size: `64`
+- Max epochs: `100`
+- Early stopping patience: `15`
+
+Evaluation snapshot from the notebook:
+
+- LSTM (normalized): `RMSE 0.023672`, `MAE 0.017531`, `R2 0.838048`
+- LSTM (price scale): `RMSE 26.684104`, `MAE 19.762132`, `R2 0.838048`
+- GRU (normalized): `RMSE 0.021273`, `MAE 0.015023`, `R2 0.869207`
+
+7-business-day forecast snapshot in the notebook:
+
+- LSTM forecast (2026-03-30 to 2026-04-07): roughly `1369.97` to `1372.69`
+- GRU forecast (2026-03-30 to 2026-04-07): roughly `1377.03` to `1375.13`
