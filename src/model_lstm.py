@@ -5,13 +5,18 @@ Implements Long Short-Term Memory (LSTM) neural network
 for time series prediction.
 """
 
+import os
+
+# Suppress TensorFlow/oneDNN warnings
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+
 import numpy as np
 from tensorflow.keras.models import Sequential, load_model
 from tensorflow.keras.layers import LSTM, Dense, Dropout, Input
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 from tensorflow.keras.optimizers import Adam
 from typing import Optional, Tuple
-import os
 
 
 def create_lstm_model(
