@@ -5,7 +5,13 @@ Handles training of both LSTM and GRU models with configurable parameters.
 """
 
 import numpy as np
-import argparse
+import argparse  
+"""
+What is argparse?
+It lets you pass values to your script from the terminal instead of hardcoding them.
+Without argparse you would have to open the file and change values manually every time
+
+"""
 import os
 import json
 import pickle
@@ -81,10 +87,10 @@ def train(
 
     if model_type.lower() == 'lstm':
         model = create_lstm_model(input_shape)
-        train_func = train_lstm_model
+        train_func = train_lstm_model  # This is called "function as a variable" in Python.
     elif model_type.lower() == 'gru':
         model = create_gru_model(input_shape)
-        train_func = train_gru_model
+        train_func = train_gru_model  # This is called "function as a variable" in Python.
     else:
         raise ValueError(f"Unknown model type '{model_type}'. Use 'lstm' or 'gru'.")
 
