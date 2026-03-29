@@ -4,15 +4,14 @@ Training Module for Stock Price Prediction
 Handles training of both LSTM and GRU models with configurable parameters.
 """
 
-import numpy as np
-import argparse  
-"""
-What is argparse?
-It lets you pass values to your script from the terminal instead of hardcoding them.
-Without argparse you would have to open the file and change values manually every time
-
-"""
 import os
+
+# Suppress TensorFlow/oneDNN warnings
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+
+import numpy as np
+import argparse
 import json
 import pickle
 
