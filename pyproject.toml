@@ -1,7 +1,7 @@
 [project]
 name = "stock-price-prediction"
 version = "0.1.0"
-description = "Add your description here"
+description = "Stock price prediction with stacked LSTM/GRU many-to-one RNN models, with a notebook-first workflow and CLI train/predict entrypoints."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
