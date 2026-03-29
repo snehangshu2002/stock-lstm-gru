@@ -37,7 +37,6 @@ def create_lstm_model(
     model = Sequential()
     model.add(Input(shape=input_shape))
 
-    # FIX: Single loop handles all layers correctly.
     # All layers except the last use return_sequences=True so that each
     # LSTM layer receives the full sequence from the one before it.
     # The last layer uses return_sequences=False to output a single vector.
@@ -50,7 +49,6 @@ def create_lstm_model(
     model.add(Dense(dense_units, activation='relu'))
     model.add(Dense(1))
 
-    # FIX: Actually use the learning_rate parameter instead of ignoring it
     model.compile(
         optimizer=Adam(learning_rate=learning_rate),
         loss='mean_squared_error',
