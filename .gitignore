@@ -13,3 +13,4 @@ wheels/
 .qwen/settings.json
 QWEN.md
 AGENTS.md
+test.py
